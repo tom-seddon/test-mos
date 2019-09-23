@@ -29,8 +29,11 @@ follows:
 * `Sxx`, `Uxx` - System/User VIA, where `xx` is the (hex) register number
 * `Pxx` - paging, where `xx` indicates the register: 00=ROMSEL, 01=ACCCON
 
-On my Master, ACCCON starts out with TST=1, so the I/O is paged out.
-If the ACCCON result is reliably `FF`, it's probably bogus.
+(On my Master, ACCCON starts out with TST=1, so the I/O is paged out.
+If the ACCCON result is reliably `FF`, it's probably bogus.)
+
+A constantly changing character in the bottom right shows that there
+are no IRQs occurring - the IRQ handler is an infinite loop.
 
 # Results from my Master
 
@@ -44,14 +47,12 @@ If the ACCCON result is reliably `FF`, it's probably bogus.
 
 * ROMSEL: $8F (ANDY=1, ROM=15)
 
-* ACCCON (inferred from some experimentation): TST=1, Y=1, X=1, D=1
+* ACCCON (inferred from some experimentation): IRR=1, TST=1, Y=1, X=1, D=1
 
-	I suspect E=1 too, but with TST=1 and Y=1 it's rather hard to say.
+	Presumably E=1 too, then, but with TST=1 and Y=1 it's rather hard
+    to say.
 
 	I don't have any easy way of testing whether IFJ=1.
-
-	If IRR=1 on startup, it seems to have no effect - the IRQ routine
-    is an infinite loop.
 
 ## CRTC
 

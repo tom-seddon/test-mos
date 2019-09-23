@@ -50,6 +50,8 @@ initial_acccon:
 ;-------------------------------------------------------------------------
 ;-------------------------------------------------------------------------
 
+indicator_addr=$7c00+24*40+39
+                
                 .section mos
 start:
 
@@ -105,7 +107,11 @@ reset: .proc
                 ; ; reset ACCCON
                 lda #0
                 sta acccon
-                
+
+                ; IRR=1 on my Master, so this isn't safe to do any
+                ; sooner.
+                cli
+
                 ; initial paging
                 lda romsel
                 sta initial_romsel
@@ -165,9 +171,24 @@ reset: .proc
                 ldx #initial_romsel
                 ldy #2
                 jsr registers
+
+                lda #32
+                sta indicator_addr
                 
+loop:
+                lda indicator_addr
+                inc a
+                bpl +
+                lda #32
++
+                sta indicator_addr
+
+                ldx #0
 -
-                jmp -
+                inx
+                bne -
+                
+                jmp loop
 
 message:
                 .text 'hello from the test MOS',0
