@@ -28,6 +28,10 @@ follows:
   write-only, so these values are junk)
 * `Sxx`, `Uxx` - System/User VIA, where `xx` is the (hex) register number
 * `Pxx` - paging, where `xx` indicates the register: 00=ROMSEL, 01=ACCCON
+* `A00` - ACIA status register
+* `a00` - ADC status register
+* `Fxx` - FDC registers: 00=status, 01=track, 02=sector, 03=data,
+  04=drive control
 
 (On my Master, ACCCON starts out with TST=1, so the I/O is paged out.
 If the ACCCON result is reliably `FF`, it's probably bogus.)
@@ -63,10 +67,22 @@ are no IRQs occurring - the IRQ handler is an infinite loop.
 ## System VIA, User VIA
 
 * DDRx = $00
-* T1L = $0000
-* T2L = random? (T2 counter values seem variable)
+* T1L = random? (T1L-H seems to be typically $00 though)
+* T2L = random? (inferred from T2 counter values being rather variable)
 * SR = random
 * ACR = $00
 * PCR = $00
 * IFR = $00
 * IER = $80
+
+## ACIA
+
+* Status register = random
+
+## ADC
+
+* Status register = random
+
+## FDC
+
+All registers seem to be random.

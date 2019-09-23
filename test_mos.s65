@@ -44,6 +44,12 @@ initial_romsel:
                 .fill 1
 initial_acccon:
                 .fill 1
+initial_fdc:
+                .fill 5
+initial_acia_sr:
+                .fill 1
+initial_adc_sr:
+                .fill 1
                 
                 .send zp
 
@@ -135,6 +141,22 @@ reset: .proc
                 dex
                 bpl -
 
+                lda $fe08
+                sta initial_acia_sr
+
+                lda $fe18
+                sta initial_adc_sr
+
+                ldx #3
+-
+                lda $fe24,x
+                sta initial_fdc,x
+                dex
+                bpl -
+                
+                lda $fe24
+                sta initial_fdc+4
+
                 ; normal(ish) code from here...
                 jsr reset_display
 
@@ -170,6 +192,21 @@ reset: .proc
                 lda #'P'
                 ldx #initial_romsel
                 ldy #2
+                jsr registers
+
+                lda #'A'
+                ldx #initial_acia_sr
+                ldy #1
+                jsr registers
+
+                lda #'a'
+                ldx #initial_adc_sr
+                ldy #1
+                jsr registers
+
+                lda #'F'
+                ldx #initial_fdc
+                ldy #5
                 jsr registers
 
                 lda #32
