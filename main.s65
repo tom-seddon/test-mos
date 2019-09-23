@@ -1,0 +1,198 @@
+*=0
+                .dsection zp
+*=$c000
+                .dsection mos
+*=$fe00
+                .dsection test_data
+*=$fffa
+                .dsection vectors
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+                .section zp
+write_dest:
+                .fill 2
+initial_r12:
+                .fill 1
+initial_r13:
+                .fill 1
+                .send zp
+                
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+                .section mos
+start:
+
+                .fill 8192,$ff
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+reset: .proc
+                sei
+
+                lda #$0f
+                sta $fe42       ;ddrb
+                lda #6
+                sta $fe40
+                lda #7
+                sta $fe40
+
+                lda #$00
+                sta write_dest+0
+                lda #$7c
+                sta write_dest+1
+
+                lda #12
+                sta $fe00
+                lda $fe01
+                sta initial_r12
+
+                lda #13
+                sta $fe00
+                lda $fe01
+                sta initial_r13
+                
+                ; reset CRTC
+                ldx #crtc_regs.end-1-crtc_regs
+-
+                lda crtc_regs,x
+                stx $fe00
+                sta $fe01
+                dex
+                bpl -
+
+                ; reset video ULA
+                lda #$4a
+                sta $fe20
+
+                ; acccon
+                ;
+                ; initial state =
+                ;
+                ; TST=0
+                
+                lda #%00111111
+                trb $fe34
+                lda #%01000000
+                tsb $fe34
+
+                ;
+                lda #32
+                ldx #0
+-
+                sta $7c00,x
+                sta $7d00,x
+                sta $7e00,x
+                sta $7f00,x
+                inx
+                bne -
+
+                lda initial_r12
+                jsr write_hex_byte
+
+                lda initial_r13
+                jsr write_hex_byte
+
+
+-
+                jmp -
+                .pend
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+get_hi_nybble_char: .proc
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                jmp get_lo_nybble_char
+                .pend
+
+get_lo_nybble_char: .proc
+                and #$0f
+                clc
+                sed
+                adc #$90
+                adc #$40
+                cld
+                jmp write_char
+                .pend
+                
+write_hex_byte: .proc
+                pha
+                jsr get_hi_nybble_char
+                jsr write_char
+                pla
+                jsr get_lo_nybble_char
+                jmp write_char
+                .pend
+                
+write_char: .proc
+                sta (write_dest)
+                inc write_dest+0
+                beq +
+                inc write_dest+1
++
+                rts
+                .pend
+                
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+irq: .proc
+                rti
+                .pend
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+nmi: .proc
+                rti
+                .pend
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+crtc_regs: .block
+                .byte 63        ;r0
+                .byte 40        ;r1
+                .byte 51        ;r2
+                .byte $24       ;r3
+                .byte 30        ;r4
+                .byte 2         ;r5
+                .byte 25        ;r6
+                .byte 27        ;r7
+                .byte $d3       ;r8
+                .byte 18        ;r9
+                .byte $72       ;r10
+                .byte $13       ;r11
+                .byte $28       ;r12
+                .byte $00       ;r13
+end:
+                .bend
+                .send mos
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+                .section test_data
+test_data: .block
+                .fill 256,'z'
+                .bend
+                .send test_data
+                
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+                .section vectors
+nmiv:
+                .word nmi
+resetv:
+                .word reset
+irqv:
+                .word irq
+                .send vectors
