@@ -32,6 +32,8 @@ follows:
 * `a00` - ADC status register
 * `Fxx` - FDC registers: 00=status, 01=track, 02=sector, 03=data,
   04=drive control
+* `V` - time between vsyncs in initial CRTC state, or `0000` if no
+  vsync detected
 
 (On my Master, ACCCON starts out with TST=1, so the I/O is paged out.
 If the ACCCON result is reliably `FF`, it's probably bogus.)
@@ -63,6 +65,10 @@ are no IRQs occurring - the IRQ handler is an infinite loop.
 * R12,R13 = $0000
 * R14,R15 = $0000
 * R16,R17 = random
+
+The time between vsyncs with the initial state seems very variable,
+and there are often no vsyncs at all. I'm assuming for now that the
+other register values are all random.
 
 ## System VIA, User VIA
 

@@ -50,6 +50,8 @@ initial_acia_sr:
                 .fill 1
 initial_adc_sr:
                 .fill 1
+vsync_counter:
+                .fill 2
                 
                 .send zp
 
@@ -79,25 +81,14 @@ reset: .proc
                 tsx
                 stx initial_s
 
-                ; Sort out DRAM refresh quickly after boot. It doesn't
-                ; matter that R0 gets overwritten - it's write-only.
-                stz $fe00
-                lda #128
-                sta $fe01
-
-;                 lda #240
-; aloop:
-;                 ldx #0
-; xloop:
-;                 ldy #0
-; yloop:
-;                 iny
-;                 bne yloop
-;                 inx
-;                 bne xloop
-;                 inc a
-;                 bne aloop
-
+                ; zero page DRAM refresh?
+                ldx #0
+-
+                lda 0,x
+                sta 0,x
+                inx
+                bne -
+                
                 ; Clear whichever bit of display RAM is initially
                 ; selected. (The ACCCON reset value can be tweaked to
                 ; explicitly showing main or shadow RAM while paging
@@ -157,6 +148,14 @@ reset: .proc
                 lda $fe24
                 sta initial_fdc+4
 
+                jsr time_vsync
+                bcs +           ;don't waste time trying again if no
+                                ;vsync...
+                jsr time_vsync
++
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
                 ; normal(ish) code from here...
                 jsr reset_display
 
@@ -209,6 +208,15 @@ reset: .proc
                 ldy #5
                 jsr registers
 
+                lda #'V'
+                jsr write_char
+                lda #'='
+                jsr write_char
+                lda vsync_counter+1
+                jsr write_hex_byte
+                lda vsync_counter+0
+                jsr write_hex_byte
+
                 lda #32
                 sta indicator_addr
                 
@@ -232,6 +240,44 @@ message:
 
                 .pend
 
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+; Get approx time between vsyncs.
+;
+; Exits with C=1 if no vsync encountered within approx 1 second.
+time_vsync: .proc
+                stz vsync_counter+0
+                stz vsync_counter+1
+
+                lda #$02
+                sta system_via.ifr
+
+                ldx #0
+                
+                clc
+-
+                lda system_via.ifr
+                and #$02
+                bne +
+
+                lda vsync_counter+0
+                adc #1
+                sta vsync_counter+0
+
+                lda vsync_counter+1
+                adc #0
+                sta vsync_counter+1
+
+                lda 0,x
+                sta 0,x
+                inx
+
+                bcc -
++                
+                rts
+                .pend
+                
 ;-------------------------------------------------------------------------
 ;-------------------------------------------------------------------------
 
