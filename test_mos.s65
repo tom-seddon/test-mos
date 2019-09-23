@@ -1,5 +1,8 @@
+                .include "submodules/beeb/include/beeb.s65"
+                
 *=0
                 .dsection zp
+                .cerror *>$100,"no"
 *=$c000
                 .dsection mos
 *=$fe00
@@ -11,14 +14,39 @@
 ;-------------------------------------------------------------------------
 
                 .section zp
+write_y:
+                .fill 1
+write_x:
+                .fill 1
 write_dest:
                 .fill 2
-initial_r12:
+registers_index:
                 .fill 1
-initial_r13:
+registers_prefix:
                 .fill 1
-                .send zp
+initial_a:
+                .fill 1
+initial_x:
+                .fill 1
+initial_y:
+                .fill 1
+initial_p:
+                .fill 1
+initial_s:
+                .fill 1
+initial_crtc:
+                .fill 18
+initial_system_via:
+                .fill 16
+initial_user_via:
+                .fill 16
+initial_romsel:
+                .fill 1
+initial_acccon:
+                .fill 1
                 
+                .send zp
+
 ;-------------------------------------------------------------------------
 ;-------------------------------------------------------------------------
 
@@ -31,31 +59,161 @@ start:
 ;-------------------------------------------------------------------------
 
 reset: .proc
+                ; initial CPU contents
+                php
                 sei
+                cld
+                sta initial_a
+                stx initial_x
+                sty initial_y
+                pla
+                sta initial_p
+                tsx
+                stx initial_s
 
-                lda #$0f
-                sta $fe42       ;ddrb
-                lda #6
-                sta $fe40
-                lda #7
-                sta $fe40
+                ; Sort out DRAM refresh quickly after boot. It doesn't
+                ; matter that R0 gets overwritten - it's write-only.
+                stz $fe00
+                lda #128
+                sta $fe01
 
-                lda #$00
-                sta write_dest+0
-                lda #$7c
-                sta write_dest+1
+;                 lda #240
+; aloop:
+;                 ldx #0
+; xloop:
+;                 ldy #0
+; yloop:
+;                 iny
+;                 bne yloop
+;                 inx
+;                 bne xloop
+;                 inc a
+;                 bne aloop
 
-                lda #12
-                sta $fe00
-                lda $fe01
-                sta initial_r12
+                ; Clear whichever bit of display RAM is initially
+                ; selected. (The ACCCON reset value can be tweaked to
+                ; explicitly showing main or shadow RAM while paging
+                ; in the other, to see which got filled with '.'.)
+                lda #'.'
+                jsr clear_display
 
-                lda #13
-                sta $fe00
-                lda $fe01
-                sta initial_r13
+                ; On my Master, TST=1 on initial power on, so the
+                ; result here is just bogus.
+                lda acccon
+                sta initial_acccon
+
+                ; ; reset ACCCON
+                lda #0
+                sta acccon
                 
-                ; reset CRTC
+                ; initial paging
+                lda romsel
+                sta initial_romsel
+                
+                ; initial VIA contents
+                ldx #15
+-
+                lda system_via,x
+                sta initial_system_via,x
+                lda user_via,x
+                sta initial_user_via,x
+                dex
+                bpl -
+
+                ; initial CRTC contents
+                ldx #17
+-
+                stx $fe00
+                lda $fe01
+                sta initial_crtc,x
+                dex
+                bpl -
+
+                ; normal(ish) code from here...
+                jsr reset_display
+
+;                 ldy #0
+; -
+;                 lda message,y
+;                 beq +
+;                 jsr write_char
+;                 iny
+;                 bra -
+; +
+
+                lda #'M'
+                ldx #initial_a
+                ldy #5
+                jsr registers
+
+                lda #'C'
+                ldx #initial_crtc
+                ldy #18
+                jsr registers
+
+                lda #'S'
+                ldx #initial_system_via
+                ldy #16
+                jsr registers
+
+                lda #'U'
+                ldx #initial_user_via
+                ldy #16
+                jsr registers
+
+                lda #'P'
+                ldx #initial_romsel
+                ldy #2
+                jsr registers
+                
+-
+                jmp -
+
+message:
+                .text 'hello from the test MOS',0
+
+                .pend
+
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+registers: .proc
+                sta registers_prefix
+                stz registers_index
+-
+                lda registers_prefix
+                jsr write_char
+
+                lda registers_index
+                jsr write_hex_byte
+
+                lda #'='
+                jsr write_char
+
+                lda 0,x
+                jsr write_hex_byte
+
+                lda #' '
+                jsr write_char
+                jsr write_char
+
+                inx
+                
+                inc registers_index
+                cpy registers_index
+                bne -
+
+                rts
+                
+                .pend
+                
+;-------------------------------------------------------------------------
+;-------------------------------------------------------------------------
+
+reset_display: .proc
+                stz write_x
+                stz write_y
+
                 ldx #crtc_regs.end-1-crtc_regs
 -
                 lda crtc_regs,x
@@ -64,23 +222,15 @@ reset: .proc
                 dex
                 bpl -
 
-                ; reset video ULA
                 lda #$4a
-                sta $fe20
+                sta video_ula_control
 
-                ; acccon
-                ;
-                ; initial state =
-                ;
-                ; TST=0
-                
-                lda #%00111111
-                trb $fe34
-                lda #%01000000
-                tsb $fe34
-
-                ;
                 lda #32
+                jsr clear_display
+                rts
+                .pend
+
+clear_display: .proc
                 ldx #0
 -
                 sta $7c00,x
@@ -90,15 +240,7 @@ reset: .proc
                 inx
                 bne -
 
-                lda initial_r12
-                jsr write_hex_byte
-
-                lda initial_r13
-                jsr write_hex_byte
-
-
--
-                jmp -
+                rts
                 .pend
 
 ;-------------------------------------------------------------------------
@@ -119,7 +261,7 @@ get_lo_nybble_char: .proc
                 adc #$90
                 adc #$40
                 cld
-                jmp write_char
+                rts
                 .pend
                 
 write_hex_byte: .proc
@@ -132,11 +274,33 @@ write_hex_byte: .proc
                 .pend
                 
 write_char: .proc
-                sta (write_dest)
-                inc write_dest+0
-                beq +
-                inc write_dest+1
-+
+                phx
+                phy
+                ldx write_y
+                ldy mode7_rows_lo,x
+                sty write_dest+0
+                ldy mode7_rows_hi,x
+                sty write_dest+1
+                ldy write_x
+                sta (write_dest),y
+                iny
+                cpy #40
+                bcs wrap_x
+                sty write_x
+                bra done
+wrap_x:
+                ; wrap to next row
+                stz write_x
+                inx
+                cpx #25
+                bcs wrap_y
+                stx write_y
+                bra done
+wrap_y:
+                stz write_y     ;should probably scroll
+done:
+                ply
+                plx
                 rts
                 .pend
                 
@@ -144,7 +308,7 @@ write_char: .proc
 ;-------------------------------------------------------------------------
 
 irq: .proc
-                rti
+                jmp irq
                 .pend
 
 ;-------------------------------------------------------------------------
@@ -157,6 +321,12 @@ nmi: .proc
 ;-------------------------------------------------------------------------
 ;-------------------------------------------------------------------------
 
+mode7_rows=$7c00+range(0,1000,40)
+mode7_rows_lo:
+                .byte <mode7_rows
+mode7_rows_hi:
+                .byte >mode7_rows
+                
 crtc_regs: .block
                 .byte 63        ;r0
                 .byte 40        ;r1
@@ -181,7 +351,7 @@ end:
 
                 .section test_data
 test_data: .block
-                .fill 256,'z'
+                .fill 256,$ff
                 .bend
                 .send test_data
                 

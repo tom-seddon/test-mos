@@ -17,4 +17,4 @@ all:
 
 .PHONY:program
 program:
-	python ./submodules/beeb/mos_program.py 7 $(BUILD)/test_mos.rom
+	python ./submodules/beeb/bin/mos_program.py 7 $(BUILD)/test_mos.rom
